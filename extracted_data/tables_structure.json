@@ -1,0 +1,134 @@
+{
+  "annees": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "cache": [
+    {
+      "name": "key",
+      "type": "varchar(255"
+    }
+  ],
+  "cache_locks": [
+    {
+      "name": "key",
+      "type": "varchar(255"
+    }
+  ],
+  "communes": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "departements": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "domaines": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "donnees": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "failed_jobs": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "indicateurs": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "jobs": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "job_batches": [
+    {
+      "name": "id",
+      "type": "varchar(255"
+    }
+  ],
+  "migrations": [
+    {
+      "name": "id",
+      "type": "int(10"
+    }
+  ],
+  "model_has_permissions": [
+    {
+      "name": "permission_id",
+      "type": "bigint(20"
+    }
+  ],
+  "model_has_roles": [
+    {
+      "name": "role_id",
+      "type": "bigint(20"
+    }
+  ],
+  "notifications": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "password_reset_tokens": [
+    {
+      "name": "email",
+      "type": "varchar(255"
+    }
+  ],
+  "permissions": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "poids_domaine": [
+    {
+      "name": "domaine_id",
+      "type": "bigint(20"
+    }
+  ],
+  "roles": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ],
+  "role_has_permissions": [
+    {
+      "name": "permission_id",
+      "type": "bigint(20"
+    }
+  ],
+  "sessions": [
+    {
+      "name": "id",
+      "type": "varchar(255"
+    }
+  ],
+  "users": [
+    {
+      "name": "id",
+      "type": "bigint(20"
+    }
+  ]
+}

@@ -1,0 +1,370 @@
+import pandas as pd
+import numpy as np
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.decomposition import PCA
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import silhouette_score
+import json
+import os
+from datetime import datetime
+
+class AIModule:
+    def __init__(self, data_dir='/workspace/uploads/extracted_data'):
+        """
+        Initialize the AI Module for indicator prediction and commune clustering
+        
+        Parameters:
+        -----------
+        data_dir : str
+            Directory containing the extracted data files
+        """
+        self.data_dir = data_dir
+        self.data = {}
+        self.models = {}
+        self.clusters = {}
+        self.pca_model = None
+        self.scaler = None
+        
+    def load_data(self):
+        """Load all necessary data from CSV files"""
+        try:
+            # Load CSV files
+            self.data['annees'] = pd.read_csv(os.path.join(self.data_dir, 'annees.csv'))
+            self.data['communes'] = pd.read_csv(os.path.join(self.data_dir, 'communes.csv'))
+            self.data['departements'] = pd.read_csv(os.path.join(self.data_dir, 'departements.csv'))
+            self.data['domaines'] = pd.read_csv(os.path.join(self.data_dir, 'domaines.csv'))
+            self.data['donnees'] = pd.read_csv(os.path.join(self.data_dir, 'donnees.csv'))
+            
+            # Create a year lookup for easier reference
+            self.year_lookup = dict(zip(self.data['annees']['id'], self.data['annees']['annee']))
+            
+            # Create commune lookup for easier reference
+            if 'nom' in self.data['communes'].columns:
+                self.commune_lookup = dict(zip(self.data['communes']['id'], self.data['communes']['nom']))
+            else:
+                self.commune_lookup = dict(zip(self.data['communes']['id'], self.data['communes']['id']))
+            
+            # Merge data for easier analysis
+            self.prepare_merged_data()
+            
+            return True
+        except Exception as e:
+            print(f"Error loading data: {e}")
+            return False
+            
+    def prepare_merged_data(self):
+        """Prepare merged dataframes for analysis"""
+        # Convert année_id to actual year value
+        if 'annee' in self.data['annees'].columns:
+            year_dict = dict(zip(self.data['annees']['id'], self.data['annees']['annee']))
+        else:
+            # Use the id as the year if 'annee' column doesn't exist
+            year_dict = {row['id']: row['id'] for _, row in self.data['annees'].iterrows()}
+            
+        self.data['donnees']['year'] = self.data['donnees']['annee_id'].map(year_dict)
+        
+        # Create a pivoted dataframe with indicators as columns
+        self.indicator_pivot = self.data['donnees'].pivot_table(
+            index=['commune_id', 'year'],
+            columns='indicateur_id',
+            values='valeur',
+            aggfunc='first'
+        ).reset_index()
+        
+        # Create a wide format for clustering (one row per commune with indicators as features)
+        # This uses the latest year's data for each commune
+        latest_data = self.data['donnees'].sort_values('year', ascending=False)
+        latest_data = latest_data.drop_duplicates(subset=['commune_id', 'indicateur_id'])
+        
+        self.commune_wide = latest_data.pivot_table(
+            index='commune_id',
+            columns='indicateur_id',
+            values='valeur',
+            aggfunc='first'
+        ).reset_index()
+        
+    def predict_indicators(self, years_to_predict=2, communes=None, start_year=None):
+        """
+        Predict indicator values for future years
+        
+        Parameters:
+        -----------
+        years_to_predict : int
+            Number of years to predict into the future
+        communes : list
+            List of commune IDs to predict for. If None, predict for all communes.
+        start_year : int
+            Year to start predictions from. If None, use the latest year in the data.
+            
+        Returns:
+        --------
+        DataFrame with predicted values
+        """
+        if not self.data:
+            self.load_data()
+            
+        # Get the unique indicators
+        indicators = self.data['donnees']['indicateur_id'].unique()
+        
+        # Load indicators data from CSV file
+        try:
+            indicators_file_path = os.path.join(self.data_dir, 'indicateurs.csv')
+            indicators_df = pd.read_csv(indicators_file_path, on_bad_lines='skip')
+            self.indicators_df = indicators_df  # Store for later use
+        except Exception as e:
+            print(f"Error loading indicators file: {e}")
+            # Continue with unique indicators from donnees if file loading fails
+        
+        # Get communes to predict for
+        if communes is None:
+            communes = self.data['communes']['id'].unique()
+        
+        # Find the max year in the data or use the specified start_year
+        if start_year is None:
+            start_year = self.data['donnees']['year'].max()
+            
+        predictions = []
+        
+        # Train a linear regression model for each indicator and commune
+        for commune_id in communes:
+            for indicator_id in indicators:
+                # Filter data for this commune and indicator
+                commune_data = self.data['donnees'][
+                    (self.data['donnees']['commune_id'] == commune_id) & 
+                    (self.data['donnees']['indicateur_id'] == indicator_id)
+                ]
+                
+                # Skip if we don't have enough data points
+                if len(commune_data) < 3:
+                    continue
+                
+                # Prepare X (years) and y (values)
+                X = commune_data[['year']].values
+                y = commune_data['valeur'].values
+                
+                # Fit linear regression model
+                model = LinearRegression()
+                model.fit(X, y)
+                
+                # Store the model for future reference
+                model_key = f"{commune_id}_{indicator_id}"
+                self.models[model_key] = model
+                
+                # Get the years that already exist in the data for this commune and indicator
+                existing_years = commune_data['year'].unique()
+                
+                # Predict future values starting from start_year
+                for future_year in range(start_year + 1, start_year + years_to_predict + 1):
+                    # Skip years that already exist in the historical data
+                    if future_year in existing_years:
+                        continue
+                        
+                    predicted_value = model.predict([[future_year]])[0]
+                    
+                    # Ensure predictions are within reasonable bounds
+                    if indicator_id in [1, 5, 8, 10, 11]:  # Assuming these are percentage indicators
+                        predicted_value = min(max(predicted_value, 0), 100)
+                    else:
+                        predicted_value = max(predicted_value, 0)
+                    
+                    predictions.append({
+                        'commune_id': commune_id,
+                        'indicateur_id': indicator_id,
+                        'year': future_year,
+                        'predicted_value': predicted_value,
+                        'is_prediction': True
+                    })
+        
+        # Convert to DataFrame
+        predictions_df = pd.DataFrame(predictions)
+        return predictions_df
+        
+    def cluster_communes(self, n_clusters=None, max_clusters=10):
+        """
+        Cluster communes based on their digitalization profiles
+        
+        Parameters:
+        -----------
+        n_clusters : int
+            Number of clusters to create. If None, optimal number is determined automatically.
+        max_clusters : int
+            Maximum number of clusters to try when determining optimal number.
+            
+        Returns:
+        --------
+        Dictionary with cluster assignments and evaluation metrics
+        """
+        if not self.data:
+            self.load_data()
+            
+        # Prepare data for clustering
+        X = self.commune_wide.drop('commune_id', axis=1)
+        
+        # Handle missing values
+        X = X.fillna(X.mean())
+        commune_ids = self.commune_wide['commune_id'].values
+        
+        # Scale the data
+        self.scaler = StandardScaler()
+        X_scaled = self.scaler.fit_transform(X)
+        
+        # Apply PCA for dimensionality reduction
+        n_components = min(X_scaled.shape[1], 10)  # Use at most 10 components
+        self.pca_model = PCA(n_components=n_components)
+        X_pca = self.pca_model.fit_transform(X_scaled)
+        
+        # Determine optimal number of clusters if not specified
+        if n_clusters is None:
+            best_score = -1
+            best_n = 2  # Default to 2 clusters
+            
+            for n in range(2, min(max_clusters + 1, len(X) - 1)):
+                kmeans = KMeans(n_clusters=n, random_state=42, n_init=10)
+                labels = kmeans.fit_predict(X_pca)
+                score = silhouette_score(X_pca, labels)
+                
+                if score > best_score:
+                    best_score = score
+                    best_n = n
+                    
+            n_clusters = best_n
+        
+        # Perform final clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42, n_init=10)
+        cluster_labels = kmeans.fit_predict(X_pca)
+        
+        # Create results dictionary
+        results = {
+            'commune_ids': commune_ids.tolist(),
+            'cluster_labels': cluster_labels.tolist(),
+            'n_clusters': n_clusters,
+            'pca_explained_variance': self.pca_model.explained_variance_ratio_.tolist(),
+            'cluster_centers_pca': kmeans.cluster_centers_.tolist(),
+            'commune_coords_pca': X_pca.tolist()
+        }
+        
+        # Save the results
+        self.clusters = results
+        return results
+        
+    def get_cluster_characteristics(self):
+        """
+        Get the characteristics of each cluster
+        
+        Returns:
+        --------
+        Dictionary with cluster characteristics
+        """
+        if not self.clusters:
+            return {}
+            
+        # Get the cluster assignments
+        commune_ids = self.clusters['commune_ids']
+        cluster_labels = self.clusters['cluster_labels']
+        
+        # Create a DataFrame with commune_id and cluster_label
+        cluster_df = pd.DataFrame({
+            'commune_id': commune_ids,
+            'cluster': cluster_labels
+        })
+        
+        # Merge with the commune_wide DataFrame
+        cluster_data = pd.merge(
+            cluster_df,
+            self.commune_wide,
+            on='commune_id'
+        )
+        
+        # Calculate mean values for each indicator in each cluster
+        cluster_means = cluster_data.groupby('cluster').mean()
+        
+        # Get the most distinctive indicators for each cluster
+        distinctive_indicators = {}
+        all_means = self.commune_wide.drop('commune_id', axis=1).mean()
+        
+        for cluster_id in range(self.clusters['n_clusters']):
+            cluster_mean = cluster_means.loc[cluster_id]
+            # Calculate z-scores for this cluster compared to overall average
+            z_scores = (cluster_mean - all_means) / all_means.std()
+            
+            # Sort by absolute z-score to find most distinctive indicators
+            top_indicators = z_scores.abs().sort_values(ascending=False).head(5).index.tolist()
+            distinctive_indicators[cluster_id] = {
+                'top_indicators': top_indicators,
+                'mean_values': cluster_mean[top_indicators].to_dict()
+            }
+            
+        return {
+            'cluster_means': cluster_means.to_dict(),
+            'distinctive_indicators': distinctive_indicators,
+            'commune_counts': cluster_data['cluster'].value_counts().to_dict()
+        }
+        
+    def prepare_dashboard_data(self, years_to_predict=2, start_year=None):
+        """
+        Prepare all data needed for the dashboard
+        
+        Parameters:
+        -----------
+        years_to_predict : int
+            Number of years to predict into the future
+        start_year : int
+            Year to start predictions from. If None, use the latest year in the data.
+            
+        Returns:
+        --------
+        Dictionary with all data needed for the dashboard
+        """
+        # Load data if not already loaded
+        if not self.data:
+            self.load_data()
+            
+        # Get predictions with optional start_year
+        predictions = self.predict_indicators(years_to_predict=years_to_predict, start_year=start_year)
+        
+        # Cluster communes
+        clusters = self.cluster_communes()
+        cluster_characteristics = self.get_cluster_characteristics()
+        
+        # Combine actual and predicted data
+        actual_data = self.data['donnees'][['commune_id', 'indicateur_id', 'year', 'valeur']]
+        actual_data = actual_data.rename(columns={'valeur': 'predicted_value'})
+        actual_data['is_prediction'] = False
+        
+        all_data = pd.concat([
+            actual_data,
+            predictions
+        ], ignore_index=True)
+        
+        # Convert to dictionary format for the dashboard
+        result = {
+            'indicator_data': all_data.to_dict(orient='records'),
+            'clusters': clusters,
+            'cluster_characteristics': cluster_characteristics,
+            'communes': self.data['communes'].to_dict(orient='records'),
+            'years': sorted(all_data['year'].unique().tolist()),
+            'indicators': sorted(all_data['indicateur_id'].unique().tolist())
+        }
+        
+        return result
+    
+    def save_dashboard_data(self, output_file='/workspace/dashboard/src/data/dashboard_data.json'):
+        """Save prepared data to a JSON file for the dashboard"""
+        # Prepare the data
+        dashboard_data = self.prepare_dashboard_data()
+        
+        # Create directories if they don't exist
+        os.makedirs(os.path.dirname(output_file), exist_ok=True)
+        
+        # Save to JSON
+        with open(output_file, 'w') as f:
+            json.dump(dashboard_data, f)
+            
+        return f"Data saved to {output_file}"
+
+if __name__ == "__main__":
+    ai_module = AIModule()
+    ai_module.load_data()
+    ai_module.save_dashboard_data()
+    print("AI module processing completed.")
