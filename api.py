@@ -289,5 +289,5 @@ async def get_dashboard_data(
         raise HTTPException(status_code=500, detail=f"Error generating dashboard data: {str(e)}")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8000))
+    port = int(os.environ.get("PORT", 8080))
     uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)

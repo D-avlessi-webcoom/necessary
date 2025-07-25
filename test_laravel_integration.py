@@ -12,7 +12,7 @@ import time
 class MockLaravelClient:
     """Simulates a Laravel client making requests to the AI Module"""
     
-    def __init__(self, api_url="http://localhost:8000"):
+    def __init__(self, api_url="http://localhost:8080"):
         self.api_url = api_url
         
     def health_check(self):
