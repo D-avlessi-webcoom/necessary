@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Union
-import uvicorn
+import gunicorn
 import os
 import sys
 import pandas as pd
@@ -290,4 +290,4 @@ async def get_dashboard_data(
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
-    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)
+    gunicorn -w 4 -k uvicorn.workers.UvicornWorker api:app -b 0.0.0.0:8080
