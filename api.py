@@ -132,7 +132,7 @@ async def get_indicators(ai: AIModule = Depends(get_ai_module)):
         indicator_list = [
             {
                 "id": int(ind),
-                "name": indicator_names.get(int(ind), f"Indicateur {ind}")
+                "nom": indicator_names.get(int(ind), f"Indicateur {ind}")
             } 
             for ind in sorted(indicators)
         ]
