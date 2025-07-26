@@ -102,8 +102,7 @@ async def health_check():
 async def get_communes(ai: AIModule = Depends(get_ai_module)):
     try:
         # Load communes from the CSV file
-        communes_file_path = os.path.join('./extracted_data', 'communes.csv')
-        communes_df = pd.read_csv(communes_file_path)
+        communes_df = ai.data['communes'].drop(['created_at', 'updated_at'], axis=1)
         communes = communes_df.to_dict(orient='records')
         return {
             "success": True,
