@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 
 class AIModule:
-    def __init__(self, data_dir='/workspace/uploads/extracted_data'):
+    def __init__(self, data_dir='./extracted_data'):
         """
         Initialize the AI Module for indicator prediction and commune clustering
         
