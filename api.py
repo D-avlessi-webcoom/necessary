@@ -1,3 +1,5 @@
+import orjson
+from fastapi.responses import ORJSONResponse
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -102,22 +104,20 @@ async def health_check():
 async def get_communes(ai: AIModule = Depends(get_ai_module)):
     try:
         communes_df = ai.data['communes']
-        print(f"DataFrame before cleaning:\n{communes_df}") # Check original DataFrame
-
         cleaned_communes_df = communes_df.replace({np.nan: None, np.inf: None, -np.inf: None}).copy()
-        print(f"DataFrame after cleaning:\n{cleaned_communes_df}") # Check cleaned DataFrame
-
         communes = cleaned_communes_df.to_dict(orient='records')
-        print(f"Final data to be returned (dict format):\n{communes}") # Check final Python dict
 
-        return {
+        response_data = {
             "success": True,
             "data": communes,
             "message": f"Successfully retrieved {len(communes)} communes",
             "timestamp": datetime.now().isoformat()
         }
+        # Use ORJSONResponse instead of default JSONResponse
+        return ORJSONResponse(content=response_data) # Ensure APIResponse model is compatible if used
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving communes: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error retrieving commun
 
 # Get available indicators endpoint
 @app.get("/indicators", response_model=APIResponse)
