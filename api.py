@@ -1,5 +1,3 @@
-import orjson
-from fastapi.responses import ORJSONResponse
 from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -103,21 +101,25 @@ async def health_check():
 @app.get("/communes", response_model=APIResponse)
 async def get_communes(ai: AIModule = Depends(get_ai_module)):
     try:
+        # 1. Get the DataFrame
         communes_df = ai.data['communes']
-        cleaned_communes_df = communes_df.replace({np.nan: None, np.inf: None, -np.inf: None}).copy()
+
+        # 2. Replace NaN and Infinity with None
+        # Use .copy() to avoid modifying the original DataFrame if it's used elsewhere
+        cleaned_communes_df = communes_df.replace({np.nan: null, np.inf: null, -np.inf: null}).copy()
+
+        # 3. Convert the cleaned DataFrame to a list of dictionaries
         communes = cleaned_communes_df.to_dict(orient='records')
 
-        response_data = {
+        return {
             "success": True,
             "data": communes,
             "message": f"Successfully retrieved {len(communes)} communes",
             "timestamp": datetime.now().isoformat()
         }
-        # Use ORJSONResponse instead of default JSONResponse
-        return ORJSONResponse(content=response_data) # Ensure APIResponse model is compatible if used
-
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error retrieving commun
+        # This will now catch any other errors, but the JSON serialization error should be gone
+        raise HTTPException(status_code=500, detail=f"Error retrieving communes: {str(e)}")
 
 # Get available indicators endpoint
 @app.get("/indicators", response_model=APIResponse)
