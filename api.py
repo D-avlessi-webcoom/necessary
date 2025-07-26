@@ -97,41 +97,18 @@ async def health_check():
             "timestamp": datetime.now().isoformat()
         }
 
-def clean_json_serializable(data):
-    """Convertit les données en types sérialisables en JSON."""
-    import math
-    
-    if isinstance(data, dict):
-        return {k: clean_json_serializable(v) for k, v in data.items()}
-    elif isinstance(data, (list, tuple)):
-        return [clean_json_serializable(item) for item in data]
-    elif isinstance(data, (int, bool, str)) or data is None:
-        return data
-    elif isinstance(data, float):
-        # Gère les valeurs infinies et NaN
-        if math.isnan(data) or math.isinf(data):
-            return None
-        # Arrondit les flottants pour éviter les problèmes de précision
-        return round(data, 6)
-    elif hasattr(data, 'to_dict'):
-        return clean_json_serializable(data.to_dict())
-    elif hasattr(data, 'item'):  # Pour les types numpy
-        return clean_json_serializable(data.item())
-    else:
-        return str(data)  # Convertit en chaîne si le type n'est pas géré
-
 # Get available communes endpoint
 @app.get("/communes", response_model=APIResponse)
 async def get_communes(ai: AIModule = Depends(get_ai_module)):
     try:
-        # Convertit le DataFrame en dictionnaire et nettoie les données
-        communes = ai.data['communes'].to_dict(orient='records')
-        cleaned_communes = clean_json_serializable(communes)
-        
+        # Load communes from the CSV file
+        communes_file_path = os.path.join('./extracted_data', 'communes.csv')
+        communes_df = pd.read_csv(communes_file_path)
+        communes = communes_df.to_dict(orient='records')
         return {
             "success": True,
-            "data": cleaned_communes,
-            "message": f"Successfully retrieved {len(cleaned_communes)} communes",
+            "data": communes,
+            "message": f"Successfully retrieved {len(communes)} communes",
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
