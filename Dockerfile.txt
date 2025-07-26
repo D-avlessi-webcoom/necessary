@@ -17,7 +17,7 @@ RUN mkdir -p /app/extracted_data
 COPY extracted_data/ /app/extracted_data/
 
 # Expose the port the app will run on
-EXPOSE 8080
+EXPOSE 8000
 
 # Command to run the application
-CMD ["gunicorn", "api:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["uvicorn", "api:app", "--host", "0.0.0.0", "--port", "8000"]

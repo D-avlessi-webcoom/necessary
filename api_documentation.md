@@ -19,7 +19,7 @@ Cette documentation détaille l'API du module d'intelligence artificielle de la 
 ## Informations générales
 
 - **Version**: 1.0.0
-- **Base URL**: `http://localhost:8080` (en développement local)
+- **Base URL**: `http://localhost:8000` (en développement local)
 - **Format de réponse**: JSON
 
 ## Installation
@@ -37,13 +37,13 @@ pip install -r requirements.txt
 Pour démarrer l'API en mode développement :
 
 ```bash
-uvicorn api:app --reload --host 0.0.0.0 --port 8080
+uvicorn api:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Pour le déploiement en production :
 
 ```bash
-gunicorn -w 4 -k uvicorn.workers.UvicornWorker api:app -b 0.0.0.0:8080
+gunicorn -w 4 -k uvicorn.workers.UvicornWorker api:app -b 0.0.0.0:8000
 ```
 
 ## Points de terminaison (Endpoints)

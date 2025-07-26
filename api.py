@@ -2,7 +2,7 @@ from fastapi import FastAPI, HTTPException, Query, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, Union
-import gunicorn
+import uvicorn
 import os
 import sys
 import pandas as pd
@@ -101,7 +101,16 @@ async def health_check():
 @app.get("/communes", response_model=APIResponse)
 async def get_communes(ai: AIModule = Depends(get_ai_module)):
     try:
-        communes = ai.data['communes'].to_dict(orient='records')
+        # 1. Get the DataFrame
+        communes_df = ai.data['communes']
+
+        # 2. Replace NaN and Infinity with None
+        # Use .copy() to avoid modifying the original DataFrame if it's used elsewhere
+        cleaned_communes_df = communes_df.replace({np.nan: None, np.inf: None, -np.inf: None}).copy()
+
+        # 3. Convert the cleaned DataFrame to a list of dictionaries
+        communes = cleaned_communes_df.to_dict(orient='records')
+
         return {
             "success": True,
             "data": communes,
@@ -109,6 +118,7 @@ async def get_communes(ai: AIModule = Depends(get_ai_module)):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
+        # This will now catch any other errors, but the JSON serialization error should be gone
         raise HTTPException(status_code=500, detail=f"Error retrieving communes: {str(e)}")
 
 # Get available indicators endpoint
@@ -289,5 +299,5 @@ async def get_dashboard_data(
         raise HTTPException(status_code=500, detail=f"Error generating dashboard data: {str(e)}")
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 8080))
-    gunicorn -w 4 -k uvicorn.workers.UvicornWorker api:app -b 0.0.0.0:8080
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("api:app", host="0.0.0.0", port=port, reload=True)
