@@ -101,15 +101,14 @@ async def health_check():
 @app.get("/communes", response_model=APIResponse)
 async def get_communes(ai: AIModule = Depends(get_ai_module)):
     try:
-        # 1. Get the DataFrame
         communes_df = ai.data['communes']
+        print(f"DataFrame before cleaning:\n{communes_df}") # Check original DataFrame
 
-        # 2. Replace NaN and Infinity with None
-        # Use .copy() to avoid modifying the original DataFrame if it's used elsewhere
         cleaned_communes_df = communes_df.replace({np.nan: None, np.inf: None, -np.inf: None}).copy()
+        print(f"DataFrame after cleaning:\n{cleaned_communes_df}") # Check cleaned DataFrame
 
-        # 3. Convert the cleaned DataFrame to a list of dictionaries
         communes = cleaned_communes_df.to_dict(orient='records')
+        print(f"Final data to be returned (dict format):\n{communes}") # Check final Python dict
 
         return {
             "success": True,
@@ -118,7 +117,6 @@ async def get_communes(ai: AIModule = Depends(get_ai_module)):
             "timestamp": datetime.now().isoformat()
         }
     except Exception as e:
-        # This will now catch any other errors, but the JSON serialization error should be gone
         raise HTTPException(status_code=500, detail=f"Error retrieving communes: {str(e)}")
 
 # Get available indicators endpoint
